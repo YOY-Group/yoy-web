@@ -3,8 +3,13 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createHmac, timingSafeEqual } from 'crypto';
 
-const { SHOPIFY_WEBHOOK_SECRET, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE } =
-  process.env;
+export const runtime = 'nodejs'; // ensure Node runtime (not Edge)
+
+const {
+  SHOPIFY_WEBHOOK_SECRET,
+  NEXT_PUBLIC_SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE,
+} = process.env;
 
 // ---- HMAC verify (raw body) ----
 function verifyShopifyHmac(raw, header) {
@@ -42,24 +47,20 @@ export async function POST(req) {
     return new NextResponse('Bad JSON', { status: 400 });
   }
 
-  // (optional) keep a copy in events for auditing
-await sb.from('events').insert({
-  type: 'shopify_order_paid',
-  payload_jsonb: { id: o.id, raw: o },   // or just: payload_jsonb: o
-});
-
-  // 4) supabase client
+  // 4) supabase client (service role so RLS can’t block inserts)
   const sb = createClient(NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
-    auth: { persistSession: false }
+    auth: { persistSession: false },
   });
 
-  // 5) optional: keep raw snapshot in events
+  // 5) (optional) audit log in `events`
   try {
     await sb.from('events').insert({
       type: 'shopify_order_paid',
-      payload_jsonb: { id: o.id, raw: o }
+      payload_jsonb: { id: o.id, raw: o }, // or simply: payload_jsonb: o
     });
-  } catch { /* ignore */ }
+  } catch (e) {
+    console.error('events insert failed:', e);
+  }
 
   // 6) map to shopify_orders
   const num = (v) => (v == null ? null : Number(v));
@@ -76,7 +77,9 @@ await sb.from('events').insert({
 
     financial_status: o.financial_status ?? null,
     fulfillment_status: o.fulfillment_status ?? null,
-    gateway: Array.isArray(o.payment_gateway_names) ? o.payment_gateway_names[0] ?? null : null,
+    gateway: Array.isArray(o.payment_gateway_names)
+      ? o.payment_gateway_names[0] ?? null
+      : null,
 
     processed_at: o.processed_at ?? null,
     created_at: o.created_at ?? null,
@@ -89,7 +92,7 @@ await sb.from('events').insert({
     shipping_address: o.shipping_address ?? null,
     billing_address: o.billing_address ?? null,
 
-    raw: { id: o.id, name: o.name },
+    raw: { id: o.id, name: o.name }, // small snapshot; full payload is in events
     source: 'vercel',
 
     shop_domain: req.headers.get('x-shopify-shop-domain') ?? null,
@@ -100,14 +103,16 @@ await sb.from('events').insert({
     paid_at: o.processed_at ?? null,
     test: !!o.test,
 
-    payload: o
+    payload: o, // (optional) if you want full payload here too
   };
 
-  try {
-    await sb.from('shopify_orders').upsert(row, { onConflict: 'shopify_order_id' });
-  } catch (e) {
-    // If you prefer to surface errors:
-    // return new NextResponse(`Upsert failed: ${String(e)}`, { status: 500 });
+  // 7) idempotent upsert
+  const { error } = await sb
+    .from('shopify_orders')
+    .upsert(row, { onConflict: 'shopify_order_id' });
+  if (error) {
+    console.error('upsert failed:', error);
+    return new NextResponse('DB error', { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
