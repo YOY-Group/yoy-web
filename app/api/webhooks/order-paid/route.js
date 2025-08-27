@@ -42,6 +42,12 @@ export async function POST(req) {
     return new NextResponse('Bad JSON', { status: 400 });
   }
 
+  // (optional) keep a copy in events for auditing
+await sb.from('events').insert({
+  type: 'shopify_order_paid',
+  payload_jsonb: { id: o.id, raw: o },   // or just: payload_jsonb: o
+});
+
   // 4) supabase client
   const sb = createClient(NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
     auth: { persistSession: false }
