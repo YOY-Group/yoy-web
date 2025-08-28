@@ -30,7 +30,7 @@ export async function POST(req) {
     return new NextResponse('Missing env', { status: 500 });
   }
 
-  // 1) read raw body
+  // 1) read raw body (required for HMAC)
   const raw = await req.text();
 
   // 2) verify signature
@@ -62,7 +62,30 @@ export async function POST(req) {
     console.error('events insert failed:', e);
   }
 
-  // 6) map to shopify_orders
+  // 6) best-effort upsert of the customer record
+  try {
+    const c = o?.customer;
+    if (c?.id) {
+      const customerRow = {
+        shopify_customer_id: String(c.id),
+        email: c.email ?? null,
+        first_name: c.first_name ?? null,
+        last_name: c.last_name ?? null,
+        shop_domain: req.headers.get('x-shopify-shop-domain') ?? null,
+        webhook_id: req.headers.get('x-shopify-webhook-id') ?? null,
+        shopify_topic: req.headers.get('x-shopify-topic') ?? 'orders/paid',
+        payload: c, // keep snapshot for debugging/analytics
+      };
+      await sb
+        .from('shopify_customers')
+        .upsert(customerRow, { onConflict: 'shopify_customer_id' });
+    }
+  } catch (e) {
+    console.error('customer upsert failed:', e);
+    // continue; order insert should not fail because of customer
+  }
+
+  // 7) map to shopify_orders
   const num = (v) => (v == null ? null : Number(v));
   const row = {
     shopify_order_id: String(o.id),
@@ -103,15 +126,16 @@ export async function POST(req) {
     paid_at: o.processed_at ?? null,
     test: !!o.test,
 
-    payload: o, // (optional) if you want full payload here too
+    payload: o, // (optional) also store full payload on the order row
   };
 
-  // 7) idempotent upsert
+  // 8) idempotent upsert
   const { error } = await sb
     .from('shopify_orders')
     .upsert(row, { onConflict: 'shopify_order_id' });
+
   if (error) {
-    console.error('upsert failed:', error);
+    console.error('order upsert failed:', error);
     return new NextResponse('DB error', { status: 500 });
   }
 
