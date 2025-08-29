@@ -57,7 +57,7 @@ export async function POST(req) {
   try {
     await sb.from('events').insert({
       type: 'shopify_order_paid',
-      payload_jsonb: { id: o.id, raw: o },
+      payload: { id: o.id, raw: o },
     });
   } catch (e) {
     console.error('events insert failed:', e);
