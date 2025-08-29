@@ -53,6 +53,15 @@ export async function POST(req) {
     auth: { persistSession: false },
   });
 
+  // 4a) upsert customer if present
+  if (o?.customer) {
+    try {
+      await sb.rpc('upsert_shopify_customer', { j: o.customer });
+    } catch (e) {
+      console.error('customer upsert failed:', e);
+    }
+  }
+
   // 5) audit log in `events`
   try {
     await sb.from('events').insert({
