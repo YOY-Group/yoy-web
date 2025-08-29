@@ -5,6 +5,7 @@ import { createHmac, timingSafeEqual } from 'crypto';
 
 export const runtime = 'nodejs'; // ensure Node runtime (not Edge)
 
+// ---- ENV VARS ----
 const {
   SHOPIFY_WEBHOOK_SECRET,
   NEXT_PUBLIC_SUPABASE_URL,
@@ -30,7 +31,7 @@ export async function POST(req) {
     return new NextResponse('Missing env', { status: 500 });
   }
 
-  // 1) read raw body (required for HMAC)
+  // 1) read raw body
   const raw = await req.text();
 
   // 2) verify signature
@@ -47,45 +48,22 @@ export async function POST(req) {
     return new NextResponse('Bad JSON', { status: 400 });
   }
 
-  // 4) supabase client (service role so RLS can’t block inserts)
+  // 4) supabase client
   const sb = createClient(NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE, {
     auth: { persistSession: false },
   });
 
-  // 5) (optional) audit log in `events`
+  // 5) audit log in `events`
   try {
     await sb.from('events').insert({
       type: 'shopify_order_paid',
-      payload_jsonb: { id: o.id, raw: o }, // or simply: payload_jsonb: o
+      payload_jsonb: { id: o.id, raw: o },
     });
   } catch (e) {
     console.error('events insert failed:', e);
   }
 
-  // 6) best-effort upsert of the customer record
-  try {
-    const c = o?.customer;
-    if (c?.id) {
-      const customerRow = {
-        shopify_customer_id: String(c.id),
-        email: c.email ?? null,
-        first_name: c.first_name ?? null,
-        last_name: c.last_name ?? null,
-        shop_domain: req.headers.get('x-shopify-shop-domain') ?? null,
-        webhook_id: req.headers.get('x-shopify-webhook-id') ?? null,
-        shopify_topic: req.headers.get('x-shopify-topic') ?? 'orders/paid',
-        payload: c, // keep snapshot for debugging/analytics
-      };
-      await sb
-        .from('shopify_customers')
-        .upsert(customerRow, { onConflict: 'shopify_customer_id' });
-    }
-  } catch (e) {
-    console.error('customer upsert failed:', e);
-    // continue; order insert should not fail because of customer
-  }
-
-  // 7) map to shopify_orders
+  // 6) map order → shopify_orders row
   const num = (v) => (v == null ? null : Number(v));
   const row = {
     shopify_order_id: String(o.id),
@@ -115,7 +93,7 @@ export async function POST(req) {
     shipping_address: o.shipping_address ?? null,
     billing_address: o.billing_address ?? null,
 
-    raw: { id: o.id, name: o.name }, // small snapshot; full payload is in events
+    raw: { id: o.id, name: o.name }, // mini snapshot
     source: 'vercel',
 
     shop_domain: req.headers.get('x-shopify-shop-domain') ?? null,
@@ -126,16 +104,15 @@ export async function POST(req) {
     paid_at: o.processed_at ?? null,
     test: !!o.test,
 
-    payload: o, // (optional) also store full payload on the order row
+    payload: o, // (optional full payload)
   };
 
-  // 8) idempotent upsert
+  // 7) upsert order
   const { error } = await sb
     .from('shopify_orders')
     .upsert(row, { onConflict: 'shopify_order_id' });
-
   if (error) {
-    console.error('order upsert failed:', error);
+    console.error('upsert failed:', error);
     return new NextResponse('DB error', { status: 500 });
   }
 
