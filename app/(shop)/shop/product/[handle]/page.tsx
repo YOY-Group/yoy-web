@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { shopifyFetch } from "@/lib/shopify/client";
 import { PRODUCT_BY_HANDLE } from "@/lib/shopify/queries";
 import Price from "@/components/commerce/Price";
-import InventoryMeter from "@/components/commerce/InventoryMeter";
+import { InventoryMeter } from "@/components/commerce/InventoryMeter";
 import Countdown from "@/components/commerce/Countdown";
 
 const AddToCartDrawer = dynamic(() => import("@/components/commerce/AddToCartDrawer"), { ssr: false });
@@ -43,10 +43,10 @@ export default async function Page({ params }: { params: { handle: string } }) {
 
         <div className="flex items-center gap-4 text-sm">
           <span className="opacity-70">Drop ends in</span>
-          <Countdown endAtISO={DROP_END_ISO} />
+          <Countdown endsAt={DROP_END_ISO} />
         </div>
 
-        <InventoryMeter total={p.totalInventory} max={150} />
+        <InventoryMeter current={p.totalInventory} max={150} />
 
         <div className="text-sm opacity-80 leading-relaxed">{p.description}</div>
 
