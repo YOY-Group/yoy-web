@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3100",
+    "dev": "next dev -p ${PORT:-3100}",
+    "dev:3101": "PORT=3101 next dev",
     "build": "next build",
-    "start": "next start -p 3100",
+    "start": "next start -p ${PORT:-3100}",
     "lint": "next lint",
     "preflight": "bash scripts/preflight.sh"
   },
@@ -31,8 +32,10 @@
     "@types/node": "^24.3.0",
     "@types/react": "19.1.12",
     "autoprefixer": "^10.4.21",
+    "dotenv": "^17.2.3",
     "postcss": "^8.5.6",
     "tailwindcss": "3.4.13",
+    "tsx": "^4.20.6",
     "typescript": "5.9.2"
   }
 }
