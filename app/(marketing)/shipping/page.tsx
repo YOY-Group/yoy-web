@@ -1,3 +1,10 @@
+import type { Metadata } from "next";
+export const metadata: Metadata = {
+  title: "Contact — YOY",
+  description: "Need help with an order or defect claim? Email support@yoy.group.",
+  alternates: { canonical: "/contact" },
+};
+
 export default function Page() {
   return (
     <main className="prose mx-auto px-4 py-12">
