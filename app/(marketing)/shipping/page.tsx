@@ -1,3 +1,12 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Shipping — YOY",
+  description:
+    "Dispatch windows and shipping details for YOY drops. Timelines shown at checkout; full policy publishes with the next drop.",
+  alternates: { canonical: "https://shop.yoy.group/shipping" },
+};
+
 export default function Page() {
   return (
     <main className="prose mx-auto px-4 py-12">
