@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Privacy Policy — YOY",
   description: "How YOY collects, uses, and protects your data.",
-  alternates: { canonical: "https://shop.yoy.group/privacy" },
+  alternates: { canonical: "/privacy" },   // was full https://...
 };
 
 export default function Page() {

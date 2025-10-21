@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-
 export const metadata: Metadata = {
-  title: "Shipping — YOY",
-  description:
-    "Dispatch windows and shipping details for YOY drops. Timelines shown at checkout; full policy publishes with the next drop.",
-  alternates: { canonical: "https://shop.yoy.group/shipping" },
+  title: "Contact — YOY",
+  description: "Need help with an order or defect claim? Email support@yoy.group.",
+  alternates: { canonical: "/contact" },
 };
 
 export default function Page() {
