@@ -1,0 +1,1 @@
+export default function HeroCinematic(){ return <section>Hero</section>; }
