@@ -4,3 +4,11 @@ out
 .env
 .env.*
 .DS_Store
+app/(shop)/shop/debug/orders/
+app/api/sync/
+app/ops/
+lib/ton/
+pnpm-workspace.yaml
+scripts/health/
+scripts/sql/
+scripts/sync/
