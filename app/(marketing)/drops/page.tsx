@@ -1,5 +1,5 @@
+// app/(marketing)/drops/page.tsx
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 
 export const metadata: Metadata = {
   title: "Drops Telemetry — YOY",
@@ -7,32 +7,37 @@ export const metadata: Metadata = {
   alternates: { canonical: "/drops" },
 };
 
-// Build an absolute URL from the current request (works on Vercel preview/prod and locally)
-function absoluteUrl(path: string) {
-  const h = headers();
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  const host  = h.get("x-forwarded-host") ?? h.get("host");
-  return `${proto}://${host}${path}`;
+// 👇 ensure this page never gets statically prerendered on Vercel
+export const dynamic = "force-dynamic";
+// (alternative would be: export const revalidate = 0)
+
+function getOrigin() {
+  // Works on Vercel Preview/Prod and locally
+  const PROTO =
+    process.env.VERCEL_ENV ? "https" : (process.env.NODE_ENV === "production" ? "https" : "http");
+  const HOST =
+    process.env.VERCEL_URL ??
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/^https?:\/\//, "") ??
+    `localhost:${process.env.PORT || "3000"}`;
+  return `${PROTO}://${HOST}`;
 }
 
 async function getData() {
+  const url = `${getOrigin()}/api/drops/stats`;
   try {
-    const url = absoluteUrl("/api/drops/stats");
-    const res = await fetch(url, { cache: "no-store" }); // dynamic on every request
-    if (!res.ok) return { drops: [] };
-
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return { drops: [] as any[] };
     const json = await res.json();
-    // Normalize either `{drops: [...]}` or `[...]`
+    // normalize either {drops: [...]} or [...]
     return Array.isArray(json) ? { drops: json } : (json?.drops ? json : { drops: [] });
   } catch {
-    return { drops: [] };
+    return { drops: [] as any[] };
   }
 }
 
 export default async function Page() {
   const { drops } = await getData();
 
-  // Empty state
   if (!drops?.length) {
     return (
       <main className="bg-[#0b0f17] min-h-screen flex items-center justify-center text-white">
@@ -44,14 +49,7 @@ export default async function Page() {
   return (
     <main className="bg-[#0b0f17] min-h-screen text-white">
       <section className="container mx-auto px-4 py-16">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-3xl font-medium">Drops Telemetry</h1>
-          <a href="/shop" className="inline-flex items-center gap-2 text-white/70 hover:text-white transition-colors">
-            <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 19l-7-7 7-7" /></svg>
-            <span>Back to Shop</span>
-          </a>
-        </div>
-
+        <h1 className="text-3xl font-medium mb-6">Drops Telemetry</h1>
         <div className="grid md:grid-cols-3 gap-4">
           {drops.map((d: any, i: number) => (
             <div key={i} className="rounded-xl border border-white/10 bg-white/5 p-4">
@@ -62,13 +60,15 @@ export default async function Page() {
 
               <div className="mt-2 flex justify-between font-mono">
                 <span className="opacity-70">% Sold</span>
-                <span className={`tabular-nums ${
-                  d.color === "green"
-                    ? "text-emerald-400"
-                    : d.color === "yellow"
-                    ? "text-yellow-300"
-                    : "text-red-400"
-                }`}>
+                <span
+                  className={`tabular-nums ${
+                    d.color === "green"
+                      ? "text-emerald-400"
+                      : d.color === "yellow"
+                      ? "text-yellow-300"
+                      : "text-red-400"
+                  }`}
+                >
                   {d.soldPct}%
                 </span>
               </div>
