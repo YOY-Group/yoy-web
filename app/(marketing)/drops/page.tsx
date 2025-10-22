@@ -1,116 +1,17 @@
-// app/(marketing)/drops/page.tsx
 import type { Metadata } from "next";
-import { headers } from "next/headers";
+import TelemetryClient from "./TelemetryClient";
 
 export const metadata: Metadata = {
   title: "Drops Telemetry — YOY",
-  robots: { index: false },           // flip when live
+  robots: { index: false },
   alternates: { canonical: "/drops" },
 };
 
-// ensure Preview/Prod never prerender this as empty HTML
-export const dynamic = "force-dynamic";
-
-function getOriginFromHeaders() {
-  const h = headers();
-  // Vercel sets these; dev has 'host'
-  const proto = h.get("x-forwarded-proto") ?? "http";
-  const host =
-    h.get("x-forwarded-host") ??
-    h.get("host") ??
-    `localhost:${process.env.PORT || "3000"}`;
-  return `${proto}://${host}`;
-}
-
-async function getData() {
-  const url = `${getOriginFromHeaders()}/api/drops/stats`;
-  try {
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) return { drops: [] as any[] };
-
-    const json = await res.json();
-    // normalize both {drops:[...]} or [...]
-    return Array.isArray(json) ? { drops: json } : json?.drops ? json : { drops: [] as any[] };
-  } catch {
-    return { drops: [] as any[] };
-  }
-}
-
-export default async function Page() {
-  const { drops } = await getData();
-
-  if (!drops?.length) {
-    return (
-      <main className="bg-[#0b0f17] min-h-screen flex items-center justify-center text-white">
-        <p className="opacity-60">No drops yet.</p>
-      </main>
-    );
-  }
-
+export default function Page() {
   return (
     <main className="bg-[#0b0f17] min-h-screen text-white">
-      <section className="container mx-auto px-4 py-16">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-medium">Drops Telemetry</h1>
-          <a
-            href="/shop"
-            className="inline-flex items-center gap-2 text-white/70 hover:text-white transition-colors"
-          >
-            <svg
-              aria-hidden="true"
-              className="h-4 w-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M15 19l-7-7 7-7" />
-            </svg>
-            <span>Back to Shop</span>
-          </a>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-4">
-          {drops.map((d: any, i: number) => (
-            <div key={i} className="rounded-xl border border-white/10 bg-white/5 p-4">
-              <div className="flex justify-between font-mono">
-                <span className="opacity-70">Drop</span>
-                <span>{d.drop}</span>
-              </div>
-
-              <div className="mt-2 flex justify-between font-mono">
-                <span className="opacity-70">% Sold</span>
-                <span
-                  className={`tabular-nums ${
-                    d.color === "green"
-                      ? "text-emerald-400"
-                      : d.color === "yellow"
-                      ? "text-yellow-300"
-                      : "text-red-400"
-                  }`}
-                >
-                  {d.soldPct}%
-                </span>
-              </div>
-
-              <div className="flex justify-between font-mono">
-                <span className="opacity-70">Pairs Left</span>
-                <span className="tabular-nums">{d.pairsLeft}</span>
-              </div>
-
-              <div className="mt-2 text-xs opacity-70">Last sale {d.lastSaleAgo}</div>
-
-              <div className="mt-3 h-8 flex items-end gap-1">
-                {d.spark?.map((v: number, j: number) => (
-                  <div key={j} style={{ height: `${Math.max(6, v)}%` }} className="w-2 bg-white/30 rounded-sm" />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* Client-side fetch to avoid preview origin issues */}
+      <TelemetryClient />
     </main>
   );
 }
