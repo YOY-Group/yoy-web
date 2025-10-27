@@ -72,9 +72,33 @@
 
 /* --- Reusable helpers --- */
 @layer utilities {
-  .container-xl { @apply mx-auto max-w-screen-xl px-4 md:px-6; }
-  .card      { @apply rounded-2xl bg-white shadow-sm border border-[rgb(var(--border))]; }
-  .muted     { color: rgb(var(--muted)); }
+  /* Layout helpers */
+  .container-xl {
+    @apply mx-auto max-w-screen-xl px-4 md:px-6;
+  }
+
+  /* Cards & muted text */
+  .card {
+    @apply rounded-2xl bg-white shadow-sm border border-[rgb(var(--border))];
+  }
+
+  .muted {
+    color: rgb(var(--muted));
+  }
+
+  /* Animated underline (Apple-style, subtle motion) */
+  .link-underline {
+    position: relative;
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    background-size: 0% 1px; /* underline thickness */
+    transition: background-size 0.25s ease, color 0.25s ease, opacity 0.25s ease;
+  }
+
+  .link-underline:hover {
+    background-size: 100% 1px;
+  }
 }
 
 @layer base {
