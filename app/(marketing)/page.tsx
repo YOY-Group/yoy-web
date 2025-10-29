@@ -10,10 +10,13 @@ export default function Page() {
   }
   return (
     <main className="container mx-auto py-16">
-      <h1 className="text-3xl font-medium">Marketing Landing</h1>
-      <p className="mt-4 text-muted-foreground">
-        (In production this will be a proper hero; in preview we redirect to /shop.)
-      </p>
-    </main>
+  <h1 className="text-3xl font-medium">
+    YOY Underwear — The First Layer
+  </h1>
+  <p className="mt-4 text-muted-foreground">
+    Private build-phase drop.  
+    Access granted via founder or first-layer invite.  
+  </p>
+</main>
   );
 }
