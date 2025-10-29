@@ -1,55 +1,71 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Let Stripe use your account's default API version
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
-
 export async function GET() {
-  console.log("ℹ️ GET /api/webhooks/stripe hit");
   return NextResponse.json({ ok: true });
 }
 
-export async function POST(req: NextRequest) {
-  // Pre-log to confirm the webhook is hitting the route
-  console.log("➡️ Stripe webhook hit", {
-    hasSignature: Boolean(req.headers.get("stripe-signature")),
-  });
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
+export async function POST(req: NextRequest) {
   const rawBody = await req.text();
-  const signature = req.headers.get("stripe-signature") || "";
+  const signature = req.headers.get('stripe-signature') as string;
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
   let event: Stripe.Event;
-
   try {
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (err: any) {
-    console.error("❌ Stripe signature verification failed:", err.message);
+    console.error('❌ Stripe signature verification failed:', err.message);
     return new NextResponse(`Webhook Error: ${err.message}`, { status: 400 });
   }
 
-  console.log("✅ Stripe event verified:", event.type);
-
   switch (event.type) {
-    case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      console.log("💳 Checkout paid:", session.id, session.customer_email);
+    case 'checkout.session.completed': {
+  const session = event.data.object as Stripe.Checkout.Session;
+  const payment_intent = (session.payment_intent ?? '') as string;
+  const email =
+    (typeof session.customer_details?.email === 'string'
+      ? session.customer_details?.email
+      : session.customer_email) || null;
 
-      // NEXT STEPS: (will wire after we see 200)
-      // 1) Upsert order into Supabase
-      // 2) Insert XP event (+10)
-      // 3) Trigger Telegram via n8n
+  const amountMinor = session.amount_total ?? 0;
+  const amount = amountMinor / 100; // store in major units to match your numeric columns
 
-      break;
-    }
+  const { error: upsertErr } = await supabaseAdmin
+    .from('orders')
+    .upsert(
+      {
+        stripe_session_id: session.id,
+        stripe_payment_intent: payment_intent || null,
+        email,
+        total_amount: amount,                             // <- maps to your column
+        currency: session.currency ?? null,               // <- maps to your column
+        status: session.payment_status ?? session.status, // <- maps to your column
+        raw: session as any                               // optional raw event payload
+      },
+      { onConflict: 'stripe_session_id' }
+    );
 
-    case "payment_intent.succeeded": {
-      console.log("💰 Payment intent succeeded");
-      break;
-    }
+  if (upsertErr) console.error('orders upsert error:', upsertErr);
+
+  const { error: xpErr } = await supabaseAdmin
+    .from('xp_events')
+    .insert({
+      kind: 'checkout_paid',
+      points: 1,
+      ref: session.id,
+      payload: { email, pi: payment_intent }
+    });
+  if (xpErr) console.error('xp_events insert error:', xpErr);
+
+  console.log('✅ Checkout paid + ledgered:', session.id, email);
+  break;
+}
 
     default:
       console.log(`ℹ️ Unhandled event type: ${event.type}`);
