@@ -1,16 +1,16 @@
+// apps/web/middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
-  const { pathname, searchParams } = req.nextUrl;
+  const url = req.nextUrl;
+  const pathname = url.pathname;
 
-  // ========== OPS BASIC AUTH PROTECTION ==========
+  // ---- /ops basic auth (unchanged) ----
   if (pathname.startsWith("/ops")) {
     const auth = req.headers.get("authorization") || "";
     const user = process.env.OPS_USER || "";
     const pass = process.env.OPS_PASS || "";
-
-    // Dev mode convenience
     if (!user || !pass) return NextResponse.next();
 
     const expected = "Basic " + btoa(`${user}:${pass}`);
@@ -20,22 +20,24 @@ export function middleware(req: NextRequest) {
         headers: { "WWW-Authenticate": 'Basic realm="YOY Ops"' },
       });
     }
-
     return NextResponse.next();
   }
 
-  // ========== ADMIN TOKEN GATE ==========
+  // ---- /admin token + no-store headers ----
   if (pathname.startsWith("/admin")) {
     const token =
-      req.headers.get("x-admin-token") ??
-      searchParams.get("key") ??
+      req.headers.get("x-admin-token") ||
+      url.searchParams.get("key") ||
       "";
-
     if (token !== process.env.ADMIN_DASHBOARD_TOKEN) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    return NextResponse.next();
+    const res = NextResponse.next();
+    res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.headers.set("Pragma", "no-cache");
+    res.headers.set("Expires", "0");
+    return res;
   }
 
   return NextResponse.next();
